@@ -14,6 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 configfile = sys.argv[1]
+nerf = sys.argv[2]
 runfile = "runfile.yaml"
 
 # Set up configuraiton
@@ -95,7 +96,7 @@ except IOError:
     logtime = datetime.now().isoformat()
     print(logtime, "ERROR: Unable to read alert file.", conf['alert_file'])
     exit(1)
-print(emails)
+#print(emails)
 
 print(logtime, "Last run:", run['lastrun'])
 
@@ -109,7 +110,6 @@ for i in range(0,len(commits)):
     if commit.committed_date > run['lastrun']:
         isodtg = datetime.utcfromtimestamp(commit.committed_date).isoformat()
         subject = conf['smtp_subject'] + " by " + commit.author.name
-        print("Subject:",subject)
         body = "<html>\n" \
             + "The following files were modified:<br>\n"
 
@@ -119,12 +119,16 @@ for i in range(0,len(commits)):
         body += "<br>\nCommit: " + str(commit) + "<br>\n" \
             + "Timestamp: " + str(commit.committed_date) + "<br>\n" \
             + "</html>\n"
-        print("Body:",body)
+        #print("Body:",body)
+        print("------------------")
+        print("Commit:",commit)
+        print("Subject:",subject)
+        print("Commit timestamp:",commit.committed_date)
+        print("Sending email to:", emails)
         send_smtp_email(emails, subject, body)
-
         #print(datetime.utcfromtimestamp(commit.committed_date).isoformat())
 
-# Write the atomic time now to the runfile and then exit cleanly. 
+# Write the atomic time now to the runfile and then exit cleanly.
 run['lastrun'] = int(now.strftime("%s"))
 #TODO: Comment the next line to keep running with a specified runtime
 # useful when testing, pick a runtime ecpoch that only has one commit after it.
