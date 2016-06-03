@@ -29,7 +29,7 @@ def log(message):
     logtime = datetime.now().isoformat()
     try:
         with open(conf['logfile'], "a") as logfile:
-            logfile.write(logtime + ' ' + message)
+            logfile.write(logtime + ' ' + message + '\n')
         logfile.close()
     except IOError:
         print(logtime, "ERROR - Unable to write to logfile.", conf['logfile'])
