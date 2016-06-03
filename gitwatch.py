@@ -14,7 +14,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 
 configfile = sys.argv[1]
-nerf = sys.argv[2]
 runfilename = "runfile.yaml"
 
 # Set up configuraiton
@@ -107,7 +106,7 @@ except IOError:
     exit(1)
 #print(emails)
 
-print(logtime, "Last run:", run['lastrun'])
+log("Last run:" + str(run['lastrun']))
 
 commits = list(repo.iter_commits('master'))
 alert_queue = []
