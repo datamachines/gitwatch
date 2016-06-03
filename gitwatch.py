@@ -15,7 +15,7 @@ from email.mime.application import MIMEApplication
 
 configfile = sys.argv[1]
 nerf = sys.argv[2]
-runfile = "runfile.yaml"
+runfilename = "runfile.yaml"
 
 # Set up configuraiton
 conf = yaml.safe_load(open(configfile))
@@ -26,9 +26,18 @@ repo = git.Repo(conf['repo_dir'])
 # as possible.
 now = datetime.now()
 
+def log(message):
+    logtime = datetime.now().isoformat()
+    try:
+        with open(conf['logfile'], "a") as logfile:
+            logfile.write(logtime + ' ' + message)
+        logfile.close()
+    except IOError:
+        print(logtime, "ERROR - Unable to write to logfile.", conf['logfile'])
+        exit(1)
+
 # logtime is read just prior to most log messages and is used to tag log output
-logtime = datetime.now().isoformat()
-print(logtime, "Initialized. Now:", int(now.strftime("%s")))
+log("Initialized. Now:" + str(now.strftime("%s")))
 
 # writes our runfile to disk.
 # TODO: write a test mode so we can ensure the filesystem is writable before.
@@ -36,11 +45,11 @@ print(logtime, "Initialized. Now:", int(now.strftime("%s")))
 # he filesystem state changes after Gitwatch is initially installed.
 def write_runfile(run):
     try:
-        with open(runfile, 'w') as outfile:
-            outfile.write( yaml.dump(run, default_flow_style=False) )
+        with open(runfilename, 'w') as runfile:
+            runfile.write( yaml.dump(run, default_flow_style=False) )
+        runfile.close()
     except IOError:
-        logtime = datetime.now().isoformat()
-        print(logtime, "ERROR - Unable to write runfile.")
+        log("ERROR - Unable to write runfile.")
         exit(1)
 
 # This works with AWS SES
@@ -61,27 +70,28 @@ def send_smtp_email(email_to, email_subject, email_body):
         smtp.login(conf['smtp_username'], conf['smtp_password'])
         smtp.sendmail(conf['smtp_from'], email_to, email_message)
         smtp.close()
+        log('Emails sent to: ' + msg['to'])
     except smtplib.SMTPConnectError:
-        print(logtime, 'ERROR - Could not connect to SMTP server.')
+        log('ERROR - Could not connect to SMTP server.')
         return 0
     except smtplib.SMTPAuthenticationError:
-        print(logtime, 'ERROR - SMTP authentication error.')
+        log('ERROR - SMTP authentication error.')
         return 0
     return 1
 
 # We try to read the runfile to get the last run time. If it doesn't exist
 # we create one and exit cleanly.
 try:
-    run = yaml.safe_load(open(runfile))
+    run = yaml.safe_load(open(runfilename))
 except IOError:
     run = dict(lastrun = int(now.strftime("%s")))
-    logtime = datetime.now().isoformat()
-    print(logtime, "First run, just creating runfile and exiting.")
-    print(logtime,
-        "Tracking new commits from this moment in time:",
-        now.isoformat())
+    log("First run, just creating runfile and exiting.")
+    log("Tracking new commits from this moment in time: " + now.isoformat())
     write_runfile(run)
     exit(0)
+
+# If this fails, the program will exit and not send annoying emails.
+write_runfile(run)
 
 # Here, we grab anything that looks like an email address from the alert-list
 # file in the repo.
@@ -93,8 +103,7 @@ try:
         alert_file_text = afile.read().lower()
     emails = list(email[0] for email in re.findall(ee, alert_file_text))
 except IOError:
-    logtime = datetime.now().isoformat()
-    print(logtime, "ERROR: Unable to read alert file.", conf['alert_file'])
+    log("ERROR: Unable to read alert file. " + conf['alert_file'])
     exit(1)
 #print(emails)
 
@@ -120,11 +129,11 @@ for i in range(0,len(commits)):
             + "Timestamp: " + str(commit.committed_date) + "<br>\n" \
             + "</html>\n"
         #print("Body:",body)
-        print("------------------")
-        print("Commit:",commit)
-        print("Subject:",subject)
-        print("Commit timestamp:",commit.committed_date)
-        print("Sending email to:", emails)
+        #print("------------------")
+        #print("Commit:",commit)
+        #print("Subject:",subject)
+        #print("Commit timestamp:",commit.committed_date)
+        #print("Sending email to:", emails)
         send_smtp_email(emails, subject, body)
         #print(datetime.utcfromtimestamp(commit.committed_date).isoformat())
 

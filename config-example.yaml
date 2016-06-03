@@ -1,4 +1,5 @@
 repo_dir: "/directory/of/the/cloned/repo/on/the/filesystem/"
+logfile: "/var/log/gitwatch.log"
 alert_file: "alert-list.md"
 md_link_prefix: "https://urlprefixtoyourfiles/"
 smtp_subject: "A descriptive subject"
