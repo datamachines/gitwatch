@@ -16,15 +16,10 @@ from email.mime.application import MIMEApplication
 configfile = sys.argv[1]
 runfilename = "runfile.yaml"
 
-# Set up configuraiton
-conf = yaml.safe_load(open(configfile))
-repo = git.Repo(conf['repo_dir'])
+###############################################################################
+# Some functions
 
-# now is a time that is only read once at the beginning of program execution.
-# Since it is later written to the runfile, we want to keep it as atomic
-# as possible.
-now = datetime.now()
-
+# Function for very simple logging capability
 def log(message):
     logtime = datetime.now().isoformat()
     try:
@@ -35,13 +30,7 @@ def log(message):
         print(logtime, "ERROR - Unable to write to logfile.", conf['logfile'])
         exit(1)
 
-# logtime is read just prior to most log messages and is used to tag log output
-log("Initialized. Now:" + str(now.strftime("%s")))
-
-# writes our runfile to disk.
-# TODO: write a test mode so we can ensure the filesystem is writable before.
-# going into the rest of the program. That will account for the edge case that
-# he filesystem state changes after Gitwatch is initially installed.
+# writes our runfile to disk which records the last time of run for idempotency
 def write_runfile(run):
     try:
         with open(runfilename, 'w') as runfile:
@@ -51,7 +40,7 @@ def write_runfile(run):
         log("ERROR - Unable to write runfile.")
         exit(1)
 
-# This works with AWS SES
+# This works with AWS SES. straightforward
 def send_smtp_email(email_to, email_subject, email_body):
     logtime = datetime.now().isoformat()
     num_recepients = len(email_to)
@@ -69,14 +58,26 @@ def send_smtp_email(email_to, email_subject, email_body):
         smtp.login(conf['smtp_username'], conf['smtp_password'])
         smtp.sendmail(conf['smtp_from'], email_to, email_message)
         smtp.close()
-        log('Emails sent to: ' + msg['to'])
+        log("Emails sent to: " + msg['to'])
     except smtplib.SMTPConnectError:
-        log('ERROR - Could not connect to SMTP server.')
+        log("ERROR - Unable to connect to SMTP server.")
         return 0
     except smtplib.SMTPAuthenticationError:
-        log('ERROR - SMTP authentication error.')
+        log("ERROR - SMTP authentication error.")
         return 0
     return 1
+
+###############################################################################
+# Program start
+
+# Set up configuraiton
+conf = yaml.safe_load(open(configfile))
+repo = git.Repo(conf['repo_dir'])
+
+# grab the time of scrip initiialization
+now = datetime.now()
+init_time = int(now.strftime("%s"))
+log("Initialized. Now: " + str(init_time))
 
 # We try to read the runfile to get the last run time. If it doesn't exist
 # we create one and exit cleanly.
@@ -104,15 +105,19 @@ try:
 except IOError:
     log("ERROR: Unable to read alert file. " + conf['alert_file'])
     exit(1)
-#print(emails)
 
-log("Last run:" + str(run['lastrun']))
-
-commits = list(repo.iter_commits('master'))
-alert_queue = []
+# Check the time and see if it makes sense
+log("Last run: " + str(run['lastrun']))
+tdelta = now.strftime("%s") - run['lastrun']
+log("Time Delta: " + str(tdelta))
+if tdelta < 0:
+    log("ERROR: Time Delta less than zero. Did the system time change?")
+    exit(1)
 
 # Iterate through the commits sending email alerts for commits that have
 # happened after the time recorded in our runtime file.
+commits = list(repo.iter_commits('master'))
+alert_queue = []
 for i in range(0,len(commits)):
     commit = commits[i]
     if commit.committed_date > run['lastrun']:
@@ -136,9 +141,7 @@ for i in range(0,len(commits)):
         send_smtp_email(emails, subject, body)
         #print(datetime.utcfromtimestamp(commit.committed_date).isoformat())
 
-# Write the atomic time now to the runfile and then exit cleanly.
-run['lastrun'] = int(now.strftime("%s"))
-#TODO: Comment the next line to keep running with a specified runtime
-# useful when testing, pick a runtime ecpoch that only has one commit after it.
+# Write the atomic initialization time to the runfile and then exit cleanly.
+run['lastrun'] = init_time
 write_runfile(run)
 exit(0)
