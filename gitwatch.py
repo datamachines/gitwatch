@@ -108,7 +108,7 @@ except IOError:
 
 # Check the time and see if it makes sense
 log("Last run: " + str(run['lastrun']))
-tdelta = now.strftime("%s") - run['lastrun']
+tdelta = init_time - run['lastrun']
 log("Time Delta: " + str(tdelta))
 if tdelta < 0:
     log("ERROR: Time Delta less than zero. Did the system time change?")
@@ -120,7 +120,8 @@ commits = list(repo.iter_commits('master'))
 alert_queue = []
 for i in range(0,len(commits)):
     commit = commits[i]
-    if commit.committed_date > run['lastrun']:
+    if commit.committed_date > run['lastrun'] \
+    and commit.committed_date < init_time:
         isodtg = datetime.utcfromtimestamp(commit.committed_date).isoformat()
         subject = conf['smtp_subject'] + " by " + commit.author.name
         body = "<html>\n" \
