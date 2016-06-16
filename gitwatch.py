@@ -123,7 +123,7 @@ for i in range(0,len(commits)):
     if commit.committed_date > run['lastrun'] \
     and commit.committed_date < init_time:
         isodtg = datetime.utcfromtimestamp(commit.committed_date).isoformat()
-        subject = conf['smtp_subject'] + " by " + commit.author.name
+        subject = "[" + conf['smtp_subject'] + "] by " + commit.author.name
         body = "<html>\n" \
             + "The following files were modified:<br>\n"
 
