@@ -36,6 +36,7 @@ def write_runfile(run):
         with open(runfilename, 'w') as runfile:
             runfile.write( yaml.dump(run, default_flow_style=False) )
         runfile.close()
+        log("Writing runfile")
     except IOError:
         log("ERROR - Unable to write runfile.")
         exit(1)
@@ -91,6 +92,8 @@ except IOError:
     exit(0)
 
 # If this fails, the program will exit and not send annoying emails.
+lastrun = run['lastrun']
+run['lastrun'] = init_time
 write_runfile(run)
 
 # Here, we grab anything that looks like an email address from the alert-list
@@ -107,8 +110,8 @@ except IOError:
     exit(1)
 
 # Check the time and see if it makes sense
-log("Last run: " + str(run['lastrun']))
-tdelta = init_time - run['lastrun']
+log("Last run: " + str(lastrun))
+tdelta = init_time - lastrun
 log("Time Delta: " + str(tdelta))
 if tdelta < 0:
     log("ERROR: Time Delta less than zero. Did the system time change?")
@@ -120,7 +123,7 @@ commits = list(repo.iter_commits('master'))
 alert_queue = []
 for i in range(0,len(commits)):
     commit = commits[i]
-    if commit.committed_date > run['lastrun'] \
+    if commit.committed_date > lastrun \
     and commit.committed_date < init_time:
         isodtg = datetime.utcfromtimestamp(commit.committed_date).isoformat()
         subject = "[" + conf['smtp_subject'] + "] by " + commit.author.name
@@ -143,6 +146,4 @@ for i in range(0,len(commits)):
         #print(datetime.utcfromtimestamp(commit.committed_date).isoformat())
 
 # Write the atomic initialization time to the runfile and then exit cleanly.
-run['lastrun'] = init_time
-write_runfile(run)
 exit(0)
